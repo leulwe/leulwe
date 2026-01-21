@@ -1,0 +1,953 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>md top df</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script> 
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script> 
+
+    <style>
+        /* --- THEMING VARIABLES --- */
+        :root {
+            --bg-color: #f6f7f9;
+            --sidebar-bg: #ffffff;
+            --card-bg: #ffffff;
+            --text-primary: #2c2c2c;
+            --text-secondary: #666;
+            --border-color: #e0e0e0;
+            --accent-color: #ff8f00; 
+            --active-item-bg: #fff3e0;
+            --active-item-text: #e65100;
+            --hover-bg: #f0f0f0;
+            --input-bg: transparent;
+            --code-bg: #f5f5f5;
+            --modal-overlay: rgba(0,0,0,0.5);
+            --shadow: 0 2px 8px rgba(0,0,0,0.05);
+            --success-color: #2e7d32;
+        } 
+
+        [data-theme="dark"] {
+            --bg-color: #121212;
+            --sidebar-bg: #1e1e1e;
+            --card-bg: #252526;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border-color: #333333;
+            --accent-color: #ffb74d;
+            --active-item-bg: #3e2723;
+            --active-item-text: #ffcc80;
+            --hover-bg: #2d2d2d;
+            --input-bg: #2d2d2d;
+            --code-bg: #1e1e1e;
+            --modal-overlay: rgba(0,0,0,0.8);
+            --shadow: 0 2px 8px rgba(0,0,0,0.4);
+            --success-color: #66bb6a;
+        } 
+
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; } 
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        } 
+
+        /* --- SIDEBAR --- */
+        #sidebar {
+            width: 300px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px 10px;
+            transition: transform 0.3s ease;
+            z-index: 200;
+            flex-shrink: 0;
+            height: 100%;
+        } 
+
+        .app-header {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        } 
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        } 
+
+        .primary-btn {
+            background-color: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            font-size: 0.9rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        } 
+
+        .secondary-btn {
+            background-color: var(--hover-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            width: 40px;
+        } 
+
+        #sidebar-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+        } 
+
+        /* Folders */
+        .folder-group { margin-bottom: 5px; }
+        .folder-header {
+            padding: 8px 10px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .folder-header:hover { color: var(--accent-color); }
+        .folder-header i { transition: transform 0.2s; }
+        .folder-header.collapsed i { transform: rotate(-90deg); }
+        
+        .note-list { list-style: none; padding: 0; margin: 0; }
+        .folder-group.collapsed .note-list { display: none; } 
+
+        .note-item {
+            padding: 12px 15px;
+            margin-bottom: 4px;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: background 0.2s;
+            margin-left: 5px;
+        }
+        .note-item:hover { background-color: var(--hover-bg); }
+        .note-item.active {
+            background-color: var(--active-item-bg);
+            border-left: 3px solid var(--accent-color);
+        }
+        .note-item-title { font-weight: 500; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; color: var(--text-primary); }
+        .note-item-date { font-size: 0.75rem; opacity: 0.7; color: var(--text-secondary); } 
+
+        /* --- MOBILE OVERLAY --- */
+        #mobile-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 150;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        #mobile-overlay.visible { opacity: 1; pointer-events: auto; } 
+
+        /* --- MAIN AREA --- */
+        #main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-color);
+            height: 100vh;
+            min-width: 0;
+            position: relative;
+        } 
+
+        .toolbar {
+            height: 60px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid transparent; 
+        } 
+
+        .toolbar-right {
+            display: flex;
+            gap: 6px;
+            background: var(--card-bg);
+            padding: 5px;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        } 
+
+        .tool-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 15px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            transition: background 0.2s;
+            display: flex; align-items: center; gap: 5px;
+        } 
+
+        .tool-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+        
+        .tool-btn.edit-mode-active { 
+            background: var(--active-item-bg); 
+            color: var(--accent-color); 
+            font-weight: 600; 
+        } 
+
+        /* Folder Select in Toolbar */
+        .folder-select-wrapper {
+            margin-right: 10px;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .folder-select-label {
+            font-size: 0.7rem;
+            margin-right: 5px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+        #folder-select {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            max-width: 150px;
+        } 
+
+        .toolbar-sep { width: 1px; background: var(--border-color); margin: 0 2px; } 
+
+        #note-title-input {
+            font-size: 1.5rem;
+            font-weight: 700;
+            border: none;
+            background: transparent;
+            padding: 10px 30px;
+            width: 100%;
+            color: var(--text-primary);
+            flex-shrink: 0;
+        } 
+
+        .editor-container {
+            flex: 1;
+            margin: 10px 30px 30px 30px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        } 
+
+        #markdown-input, #preview-output {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            border: none;
+            resize: none;
+            padding: 30px;
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: transparent;
+            overflow-y: auto;
+        } 
+
+        #markdown-input { font-family: 'Courier New', monospace; } 
+
+        /* Preview Styles */
+        #preview-output h1, #preview-output h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+        #preview-output code { background: var(--code-bg); padding: 2px 5px; border-radius: 4px; font-family: monospace; color: var(--text-primary); }
+        #preview-output pre { background: var(--code-bg); padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border-color); }
+        #preview-output blockquote { border-left: 4px solid var(--accent-color); margin: 0; padding-left: 15px; color: var(--text-secondary); }
+        #preview-output img { max-width: 100%; border-radius: 8px; }
+        #preview-output ul { padding-left: 20px; }
+        #preview-output a { color: var(--accent-color); text-decoration: none; }
+        #preview-output table { border-collapse: collapse; width: 100%; }
+        #preview-output th, #preview-output td { border: 1px solid var(--border-color); padding: 8px; } 
+
+        /* --- MODAL --- */
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--modal-overlay);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .modal-backdrop.visible { opacity: 1; pointer-events: auto; } 
+
+        .modal-content {
+            background: var(--card-bg);
+            width: 90%; max-width: 400px;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            color: var(--text-primary);
+        } 
+
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 1.2rem; font-weight: 700; }
+        .close-modal { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-secondary); } 
+
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .setting-label { font-weight: 500; display: flex; align-items: center; gap: 10px; }
+        
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-color); }
+        input:checked + .slider:before { transform: translateX(24px); } 
+
+        .modal-btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--hover-bg);
+            color: var(--text-primary);
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .modal-btn:hover { background: var(--border-color); } 
+
+        /* --- PRINT / PDF STYLES --- */
+        @media print {
+            #sidebar, .toolbar, #note-title-input, #mobile-overlay, .modal-backdrop { display: none !important; }
+            body, #main-area, .editor-container { 
+                background: white; color: black; height: auto; margin: 0; padding: 0; box-shadow: none; border: none; overflow: visible; 
+            }
+            .editor-container { margin: 0; border-radius: 0; }
+            #preview-output { 
+                display: block !important; padding: 0 20px; font-size: 12pt; color: black; 
+            }
+            #markdown-input { display: none !important; }
+            
+            /* Add Title to Print */
+            #preview-output::before {
+                content: attr(data-print-title);
+                display: block;
+                font-size: 24pt;
+                font-weight: bold;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+            }
+        } 
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            #sidebar { 
+                position: absolute; height: 100%; 
+                transform: translateX(-100%); 
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1); 
+            }
+            #sidebar.open { transform: translateX(0); }
+            .editor-container { margin: 10px; border-radius: 12px; }
+            #note-title-input { padding: 10px 15px; font-size: 1.2rem; }
+            .menu-toggle { display: block; margin-right: 15px; cursor: pointer; font-size: 1.2rem; }
+            .toolbar { padding: 0 10px; overflow-x: auto; }
+            /* Hide text labels on mobile */
+            .tool-btn span { display: none; } 
+            
+            /* On mobile, we might want to hide the move folder dropdown if space is tight, 
+               but for this request we will try to keep it visible or accessible */
+        }
+        @media (min-width: 769px) { .menu-toggle, .close-sidebar-btn { display: none; } } 
+
+    </style>
+</head>
+<body> 
+
+    <div id="mobile-overlay" onclick="toggleSidebar()"></div> 
+
+    <div id="sidebar">
+        <div class="app-header">
+            <span><i class="fas fa-layer-group" style="color: var(--accent-color);"></i> md top df</span>
+            <button class="close-sidebar-btn" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <div class="action-buttons">
+            <button class="primary-btn" onclick="createNewNote()">
+                <i class="fas fa-plus"></i> Note
+            </button>
+            <button class="secondary-btn" onclick="createFolder()" title="New Folder">
+                <i class="fas fa-folder-plus"></i>
+            </button>
+        </div> 
+
+        <div id="sidebar-scroll-area">
+            </div>
+    </div> 
+
+    <div id="main-area">
+        <div class="toolbar">
+            <div style="display:flex; align-items:center;">
+                <i class="fas fa-bars menu-toggle" onclick="toggleSidebar()"></i>
+                <span id="status-msg" style="font-size: 0.8rem; color: var(--text-secondary); margin-left: 5px;">Ready</span>
+            </div>
+            
+            <div class="toolbar-right">
+                
+                <div class="folder-select-wrapper">
+                    <span class="folder-select-label"><i class="fas fa-folder"></i></span>
+                    <select id="folder-select" onchange="moveCurrentNote(this.value)" title="Move to Folder">
+                        <option value="root">Uncategorized</option>
+                    </select>
+                </div> 
+
+                <div class="toolbar-sep"></div> 
+
+                <button class="tool-btn active" id="btn-edit" onclick="setMode('edit')" title="Edit Mode">
+                    <i class="fas fa-pen"></i> <span>Edit</span>
+                </button>
+                
+                <button class="tool-btn" id="btn-done" onclick="setMode('view')" title="View Mode">
+                    <i class="fas fa-eye"></i> <span>View</span>
+                </button> 
+
+                <div class="toolbar-sep"></div> 
+
+                <button class="tool-btn" onclick="shareNote()" title="Share Note">
+                    <i class="fas fa-share-alt"></i>
+                </button> 
+
+                <button class="tool-btn" onclick="printNote()" title="Save as PDF / Print">
+                    <i class="fas fa-print"></i>
+                </button> 
+
+                <div class="toolbar-sep"></div> 
+
+                <button class="tool-btn" onclick="openSettings()" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+                
+                <button class="tool-btn delete" onclick="deleteCurrentNote()" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div> 
+
+        <input type="text" id="note-title-input" placeholder="Title goes here..." oninput="saveCurrentNote()"> 
+
+        <div class="editor-container">
+            <textarea id="markdown-input" placeholder="Type Markdown here..." oninput="saveCurrentNote()"></textarea>
+            <div id="preview-output" style="display:none;" data-print-title=""></div>
+        </div>
+    </div> 
+
+    <input type="file" id="file-import-input" accept=".md,.markdown,.txt" style="display: none;" onchange="handleFileImport(this)"> 
+
+    <div class="modal-backdrop" id="settings-modal" onclick="closeSettings(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Settings</span>
+                <button class="close-modal" onclick="closeSettings(null, true)"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="setting-row">
+                <span class="setting-label"><i class="fas fa-moon"></i> Dark Mode</span>
+                <label class="switch">
+                    <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode()">
+                    <span class="slider"></span>
+                </label>
+            </div> 
+
+            <div class="setting-row">
+                <span class="setting-label"><i class="fas fa-text-height"></i> Font Size</span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:0.8rem">A</span>
+                    <input type="range" id="font-size-slider" min="12" max="24" step="1" oninput="changeFontSize(this.value)">
+                    <span style="font-size:1.2rem">A</span>
+                </div>
+            </div> 
+
+            <hr style="border:0; border-top:1px solid var(--border-color); margin: 15px 0;"> 
+
+            <button class="modal-btn" onclick="triggerImport()">
+                <i class="fas fa-file-import"></i> Import File (.md/.txt)
+            </button> 
+
+            <button class="modal-btn" onclick="exportCurrentNote()">
+                <i class="fas fa-file-export"></i> Export Current Note (.md)
+            </button> 
+
+            <button class="modal-btn" onclick="exportAllNotes()" style="color: var(--accent-color); border-color: var(--accent-color);">
+                <i class="fas fa-file-archive"></i> Export All Notes (.zip)
+            </button>
+        </div>
+    </div> 
+
+    <script>
+        // --- DATA & SETTINGS MANAGEMENT ---
+        let notes = JSON.parse(localStorage.getItem('md_top_df_notes')) || [];
+        // Structure: { id, name, collapsed: false }
+        let folders = JSON.parse(localStorage.getItem('md_top_df_folders')) || []; 
+        let appSettings = JSON.parse(localStorage.getItem('md_top_df_settings')) || { theme: 'light', fontSize: 16 };
+        let currentNoteId = null; 
+
+        // Apply settings immediately
+        applySettings(); 
+
+        // Init App
+        if (notes.length === 0) createNewNote(false);
+        else loadNote(notes[0].id);
+        
+        renderSidebar(); 
+
+        // --- CORE FUNCTIONS --- 
+
+        function createNewNote(shouldRender = true) {
+            const newNote = {
+                id: Date.now(),
+                title: "New Note",
+                content: "# New Note\n\nStart typing here...",
+                folderId: 'root', // Default to Uncategorized
+                updated: new Date().toISOString()
+            };
+            notes.unshift(newNote);
+            saveToStorage();
+            if (shouldRender) {
+                renderSidebar();
+                loadNote(newNote.id);
+                setMode('edit');
+                if (window.innerWidth <= 768 && document.getElementById('sidebar').classList.contains('open')) {
+                    toggleSidebar();
+                }
+            }
+        } 
+
+        function createFolder() {
+            const name = prompt("Enter Folder Name:");
+            if (name) {
+                const newFolder = {
+                    id: 'f_' + Date.now(),
+                    name: name,
+                    collapsed: false
+                };
+                folders.push(newFolder);
+                saveToStorage();
+                renderSidebar();
+                updateFolderDropdown();
+            }
+        } 
+
+        function saveToStorage() {
+            localStorage.setItem('md_top_df_notes', JSON.stringify(notes));
+            localStorage.setItem('md_top_df_folders', JSON.stringify(folders));
+        } 
+
+        // --- RENDERING SIDEBAR WITH FOLDERS ---
+        function renderSidebar() {
+            const container = document.getElementById('sidebar-scroll-area');
+            container.innerHTML = '';
+            
+            // 1. Render Folders
+            folders.forEach(folder => {
+                const folderNotes = notes.filter(n => n.folderId === folder.id);
+                
+                // Folder Header
+                const groupDiv = document.createElement('div');
+                groupDiv.className = `folder-group ${folder.collapsed ? 'collapsed' : ''}`;
+                
+                const header = document.createElement('div');
+                header.className = `folder-header ${folder.collapsed ? 'collapsed' : ''}`;
+                header.innerHTML = `<span><i class="fas fa-chevron-down" style="font-size:0.7em; margin-right:6px;"></i> ${folder.name}</span> <span style="font-size:0.7em; opacity:0.5;">${folderNotes.length}</span>`;
+                header.onclick = (e) => {
+                    toggleFolder(folder.id);
+                };
+                header.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    deleteFolder(folder.id);
+                } 
+
+                // List for this folder
+                const ul = document.createElement('ul');
+                ul.className = 'note-list';
+                
+                folderNotes.forEach(note => {
+                    ul.appendChild(createNoteListItem(note));
+                }); 
+
+                groupDiv.appendChild(header);
+                groupDiv.appendChild(ul);
+                container.appendChild(groupDiv);
+            }); 
+
+            // 2. Render Uncategorized (Root)
+            const rootNotes = notes.filter(n => !n.folderId || n.folderId === 'root');
+            if (rootNotes.length > 0 || folders.length === 0) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'folder-group';
+                const header = document.createElement('div');
+                header.className = 'folder-header';
+                header.innerHTML = `<span><i class="fas fa-inbox" style="margin-right:6px;"></i> Uncategorized</span>`;
+                
+                const ul = document.createElement('ul');
+                ul.className = 'note-list';
+                rootNotes.forEach(note => {
+                    ul.appendChild(createNoteListItem(note));
+                });
+                
+                groupDiv.appendChild(header);
+                groupDiv.appendChild(ul);
+                container.appendChild(groupDiv);
+            }
+        } 
+
+        function createNoteListItem(note) {
+            const li = document.createElement('li');
+            li.className = `note-item ${note.id === currentNoteId ? 'active' : ''}`;
+            li.onclick = () => {
+                loadNote(note.id);
+                if (window.innerWidth <= 768) toggleSidebar();
+            };
+            const date = new Date(note.updated).toLocaleDateString();
+            li.innerHTML = `<div class="note-item-title">${note.title || 'Untitled'}</div><div class="note-item-date">${date}</div>`;
+            return li;
+        } 
+
+        function toggleFolder(id) {
+            const folder = folders.find(f => f.id === id);
+            if (folder) {
+                folder.collapsed = !folder.collapsed;
+                saveToStorage();
+                renderSidebar();
+            }
+        } 
+
+        function deleteFolder(id) {
+            if (confirm("Delete this folder? Notes inside will be moved to Uncategorized.")) {
+                // Move notes to root
+                notes.forEach(n => {
+                    if (n.folderId === id) n.folderId = 'root';
+                });
+                folders = folders.filter(f => f.id !== id);
+                saveToStorage();
+                renderSidebar();
+                updateFolderDropdown();
+            }
+        } 
+
+        // --- NOTE LOGIC --- 
+
+        function loadNote(id) {
+            currentNoteId = id;
+            const note = notes.find(n => n.id === id);
+            if(!note) return; 
+
+            document.getElementById('note-title-input').value = note.title;
+            document.getElementById('markdown-input').value = note.content;
+            
+            // Set Print Title & Browser Tab Title
+            document.getElementById('preview-output').setAttribute('data-print-title', note.title); 
+            document.title = note.title ? `${note.title} - md top df` : 'md top df'; 
+
+            // Update folder dropdown selection
+            updateFolderDropdown();
+            const select = document.getElementById('folder-select');
+            select.value = note.folderId || 'root'; 
+
+            renderSidebar(); // Update active state
+            
+            if(document.getElementById('preview-output').style.display !== 'none') {
+                updatePreview();
+            }
+        } 
+
+        function saveCurrentNote() {
+            if (!currentNoteId) return;
+            const note = notes.find(n => n.id === currentNoteId);
+            if (!note) return; 
+
+            note.title = document.getElementById('note-title-input').value;
+            note.content = document.getElementById('markdown-input').value;
+            note.updated = new Date().toISOString();
+            
+            // Update print title & Document title
+            document.getElementById('preview-output').setAttribute('data-print-title', note.title);
+            document.title = note.title ? `${note.title} - md top df` : 'md top df';
+            
+            saveToStorage();
+            
+            // Debounced render sidebar
+            clearTimeout(window.saveTimer);
+            window.saveTimer = setTimeout(() => {
+                renderSidebar();
+                const status = document.getElementById('status-msg');
+                status.innerText = 'Saved';
+                setTimeout(() => status.innerText = 'Ready', 1000);
+            }, 500); 
+
+            document.getElementById('status-msg').innerText = 'Typing...';
+        } 
+
+        function deleteCurrentNote() {
+            if (!confirm("Delete this note?")) return;
+            notes = notes.filter(n => n.id !== currentNoteId);
+            saveToStorage();
+            if (notes.length > 0) loadNote(notes[0].id);
+            else createNewNote();
+        } 
+
+        function moveCurrentNote(folderId) {
+            if (!currentNoteId) return;
+            const note = notes.find(n => n.id === currentNoteId);
+            note.folderId = folderId;
+            saveToStorage();
+            renderSidebar();
+            // Optional: visual feedback
+            const status = document.getElementById('status-msg');
+            status.innerText = 'Moved';
+            setTimeout(() => status.innerText = 'Ready', 1000);
+        } 
+
+        function updateFolderDropdown() {
+            const select = document.getElementById('folder-select');
+            // Keep the first option (Uncategorized)
+            select.innerHTML = '<option value="root">Uncategorized</option>';
+            folders.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.id;
+                opt.innerText = f.name;
+                select.appendChild(opt);
+            });
+            // Reselect current
+            const note = notes.find(n => n.id === currentNoteId);
+            if(note) select.value = note.folderId || 'root';
+        } 
+
+        // --- EDITOR MODES ---
+        function setMode(mode) {
+            const input = document.getElementById('markdown-input');
+            const preview = document.getElementById('preview-output');
+            const btnEdit = document.getElementById('btn-edit');
+            const btnDone = document.getElementById('btn-done'); 
+
+            if (mode === 'edit') {
+                input.style.display = 'block';
+                preview.style.display = 'none';
+                btnEdit.classList.add('edit-mode-active');
+                btnDone.classList.remove('done-btn');
+                btnDone.style.opacity = '0.5';
+            } else {
+                updatePreview();
+                input.style.display = 'none';
+                preview.style.display = 'block';
+                btnEdit.classList.remove('edit-mode-active');
+                btnDone.classList.add('done-btn');
+                btnDone.style.opacity = '1';
+            }
+        } 
+
+        function updatePreview() {
+            const raw = document.getElementById('markdown-input').value;
+            const previewDiv = document.getElementById('preview-output');
+            previewDiv.innerHTML = marked.parse(raw);
+            renderMathInElement(previewDiv, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError : false
+            });
+        } 
+
+        // --- FEATURES: SHARE, PDF, EXPORT --- 
+
+        async function shareNote() {
+            if (!currentNoteId) return;
+            const note = notes.find(n => n.id === currentNoteId);
+            
+            const shareData = {
+                title: note.title,
+                text: note.content
+            }; 
+
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                } catch (err) {
+                    console.log('Share canceled');
+                }
+            } else {
+                navigator.clipboard.writeText(note.content).then(() => {
+                    alert('Share API not supported. Note content copied to clipboard!');
+                });
+            }
+        } 
+
+        function printNote() {
+            // Force view mode first so the content renders
+            setMode('view');
+            // Small delay to ensure render finishes
+            setTimeout(() => {
+                window.print();
+            }, 300);
+        } 
+
+        function exportCurrentNote() {
+            if (!currentNoteId) return;
+            const note = notes.find(n => n.id === currentNoteId);
+            const blob = new Blob([note.content], { type: 'text/markdown' });
+            saveAs(blob, `${(note.title || 'note').replace(/[^a-z0-9]/gi, '_')}.md`);
+        } 
+
+        function exportAllNotes() {
+            if (notes.length === 0) return alert("No notes to export.");
+            
+            const zip = new JSZip();
+            
+            // Add folders to zip
+            const rootFolder = zip.folder("All Notes");
+            
+            // Helper to clean filename
+            const cleanName = (name) => (name || 'untitled').replace(/[^a-z0-9]/gi, '_'); 
+
+            // 1. Process Uncategorized
+            notes.filter(n => !n.folderId || n.folderId === 'root').forEach(n => {
+                rootFolder.file(`${cleanName(n.title)}.md`, n.content);
+            }); 
+
+            // 2. Process Folders
+            folders.forEach(f => {
+                const folderZip = rootFolder.folder(cleanName(f.name));
+                const folderNotes = notes.filter(n => n.folderId === f.id);
+                folderNotes.forEach(n => {
+                    folderZip.file(`${cleanName(n.title)}.md`, n.content);
+                });
+            }); 
+
+            // Generate and save
+            zip.generateAsync({type:"blob"}).then(function(content) {
+                saveAs(content, "md_top_df_backup.zip");
+            });
+        } 
+
+        // --- SETTINGS & IMPORT ---
+        function openSettings() {
+            document.getElementById('settings-modal').classList.add('visible');
+            document.getElementById('dark-mode-toggle').checked = (appSettings.theme === 'dark');
+            document.getElementById('font-size-slider').value = appSettings.fontSize;
+        } 
+
+        function closeSettings(e, force = false) {
+            if (force || e.target.id === 'settings-modal') {
+                document.getElementById('settings-modal').classList.remove('visible');
+            }
+        } 
+
+        function toggleDarkMode() {
+            appSettings.theme = appSettings.theme === 'light' ? 'dark' : 'light';
+            saveSettings();
+            applySettings();
+        } 
+
+        function changeFontSize(val) {
+            appSettings.fontSize = val;
+            saveSettings();
+            applySettings();
+        } 
+
+        function saveSettings() {
+            localStorage.setItem('md_top_df_settings', JSON.stringify(appSettings));
+        } 
+
+        function applySettings() {
+            if (appSettings.theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+            document.getElementById('markdown-input').style.fontSize = appSettings.fontSize + 'px';
+            document.getElementById('preview-output').style.fontSize = appSettings.fontSize + 'px';
+        } 
+
+        function triggerImport() { document.getElementById('file-import-input').click(); } 
+
+        function handleFileImport(input) {
+            const file = input.files[0];
+            if (!file) return; 
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const title = file.name.replace(/\.[^/.]+$/, ""); 
+                const newNote = {
+                    id: Date.now(),
+                    title: title,
+                    content: content,
+                    folderId: 'root',
+                    updated: new Date().toISOString()
+                }; 
+                notes.unshift(newNote);
+                saveToStorage();
+                renderSidebar();
+                loadNote(newNote.id);
+                alert('Imported!');
+                input.value = '';
+                closeSettings(null, true);
+            };
+            reader.readAsText(file);
+        } 
+
+        // --- UI UTILS ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('visible');
+        } 
+
+        document.getElementById('markdown-input').addEventListener('keydown', function(e) {
+            if (e.key == 'Tab') {
+                e.preventDefault();
+                var start = this.selectionStart;
+                var end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + "\t" + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 1;
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+cd
